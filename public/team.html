@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#2c2c2a">
+<title>퀴즈로 알아보는 정읍</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --bg:#2c2c2a; --soft:#3a3a38; --panel2:#454541;
+  --ink:#fdf2dc; --ink2:#a9a7a0; --ink3:#7c7a73;
+  --line:rgba(253,242,220,.14); --line2:rgba(253,242,220,.07);
+  --yellow:#fdce0f; --deep:#8a7320; --no:#e8705f;
+  --fill:#fdf2dc; --fillInk:#2c2c2a;   /* 넓은 면 — 샛노랑 대신 크림 */
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%}
+body{
+  font-family:'Pretendard Variable',Pretendard,-apple-system,'Malgun Gothic','맑은 고딕',sans-serif;
+  background:var(--bg);color:var(--ink);
+  display:flex;flex-direction:column;min-height:100dvh;
+  padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  -webkit-font-smoothing:antialiased;
+}
+.bar{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:var(--bg);z-index:5}
+.bar .t{font-size:15px;font-weight:700;letter-spacing:-.02em}
+.bar .sp{flex:1}
+.myteam{font-size:14px;font-weight:700;background:rgba(253,242,220,.14);color:var(--fill);padding:7px 16px;border-radius:999px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--no);display:inline-block}
+.dot.live{background:var(--yellow)}
+main{flex:1;padding:26px 18px 34px;display:flex;flex-direction:column}
+
+.h{font-size:25px;font-weight:700;letter-spacing:-.03em;line-height:1.34;margin-bottom:8px}
+.sub{font-size:15px;color:var(--ink2);font-weight:500;line-height:1.55}
+
+/* 테이블 선택 */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:26px}
+.tcard{background:var(--soft);border:2px solid transparent;border-radius:20px;padding:18px 16px;text-align:left;cursor:pointer;transition:.15s}
+.tcard:active{transform:scale(.97)}
+.tcard .n{font-size:25px;font-weight:700;letter-spacing:-.03em}
+.tcard .a{font-size:12px;color:var(--ink3);font-weight:500;margin-top:5px;line-height:1.4}
+.tcard .n{color:var(--ink)} .tcard .a{color:var(--ink3)}
+.tcard:active{border-color:var(--yellow)}
+.tcard.taken{opacity:.42}
+.tcard.taken .n::after{content:' 접속중';font-size:11.5px;font-weight:600;letter-spacing:0}
+
+/* 문제 */
+.badges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.badge{font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:999px;background:var(--soft);color:var(--ink2)}
+.badge.num{background:var(--fill);color:var(--fillInk);font-weight:800}
+.badge.practice{background:var(--fill);color:var(--fillInk);font-weight:800}
+.q{font-size:26px;font-weight:700;line-height:1.44;letter-spacing:-.03em;margin-bottom:24px}
+.opts{display:flex;flex-direction:column;gap:13px}
+.opt{display:flex;align-items:center;gap:16px;background:var(--soft);border:2px solid transparent;border-radius:20px;
+  padding:22px 18px;text-align:left;width:100%;cursor:pointer;transition:.15s;color:inherit;font:inherit}
+.opt:active{transform:scale(.98)}
+.opt .n{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:var(--panel2);display:grid;place-items:center;font-weight:700;font-size:17px;color:var(--ink3)}
+.opt .t{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.opt.sel{background:rgba(253,206,15,.16);border-color:var(--yellow)}
+.opt.sel .n{background:var(--fill);color:var(--fillInk)}
+.opt.sel .t{color:var(--fill);font-weight:700}
+.opt.correct{background:rgba(253,206,15,.16);border-color:var(--yellow)}
+.opt.correct .n{background:var(--fill);color:var(--fillInk)}
+.opt.correct .t{color:var(--fill);font-weight:700}
+.opt.wrong{background:rgba(232,112,95,.16);border-color:var(--no)}
+.opt.wrong .n{background:var(--no);color:#2c2c2a}
+.opt.wrong .t{color:var(--no);font-weight:700}
+.opt:disabled{cursor:default}
+.opt.mute:disabled{opacity:.5}
+
+.timer{margin-top:24px}
+.tbar{height:4px;border-radius:99px;background:var(--line2);overflow:hidden}
+.tbar i{display:block;height:100%;border-radius:99px;background:var(--yellow);transition:width .25s linear}
+.tbar.warn i{background:var(--no)}
+.tmeta{display:flex;justify-content:space-between;margin-top:11px;font-size:15px;font-weight:600;color:var(--ink2)}
+.tmeta .n{font-variant-numeric:tabular-nums;font-size:19px;font-weight:700;color:var(--ink)}
+.tmeta .n.warn{color:var(--no)}
+
+.status{margin-top:20px;padding:16px 18px;border-radius:16px;font-size:15.5px;font-weight:600;text-align:center;
+  background:var(--soft);color:var(--ink2)}
+.status.ok{background:rgba(253,242,220,.14);color:var(--fill);font-weight:700}
+
+/* 정답 공개 */
+.verdict{text-align:center;padding:30px 16px 26px}
+.verdict .mk{width:96px;height:96px;margin:0 auto;border-radius:50%;display:grid;place-items:center;
+  font-size:52px;font-weight:700;background:var(--soft);color:var(--ink3)}
+.verdict.ok .mk{background:var(--fill);color:var(--fillInk)}
+.verdict.no .mk{background:rgba(232,112,95,.16);color:var(--no)}
+.verdict .lb{font-size:21px;font-weight:700;margin-top:16px}
+.verdict .an{font-size:16px;color:var(--ink2);font-weight:600;margin-top:10px}
+.card{background:var(--soft);border-radius:20px;padding:20px;margin-top:16px}
+.card.hl{background:rgba(253,206,15,.16)}
+.card .lb{font-size:11.5px;font-weight:700;color:var(--yellow);letter-spacing:.18em;margin-bottom:9px}
+.card .v{font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1.3;color:var(--fill)}
+.card p{font-size:16px;line-height:1.68;color:var(--ink);font-weight:400}
+.card .src{font-size:12px;color:var(--ink3);margin-top:12px;font-weight:500}
+
+.scorebar{display:flex;gap:12px;margin-top:16px}
+.sb{flex:1;background:var(--soft);border-radius:18px;padding:16px;text-align:center}
+.sb .k{font-size:12px;color:var(--ink3);font-weight:600}
+.sb .v{font-size:29px;font-weight:700;color:var(--fill);letter-spacing:-.03em;margin-top:3px}
+
+/* 대기 / 최종 */
+.center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:14px;padding:36px 10px}
+.center .big{font-size:29px;font-weight:700;letter-spacing:-.03em;line-height:1.4}
+.pulse{width:56px;height:56px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--yellow);animation:sp 1s linear infinite;margin-bottom:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.medal{font-size:66px;line-height:1}
+.rankbig{font-size:62px;font-weight:700;color:var(--fill);letter-spacing:-.045em;line-height:1}
+.foot{padding:18px 18px 24px;text-align:center;font-size:12px;color:var(--ink3);font-weight:500}
+.link{color:var(--ink2);text-decoration:underline;cursor:pointer;font-size:12.5px;font-weight:600}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="dot" id="dot"></span>
+  <div class="t" id="ttl">퀴즈로 알아보는 정읍</div>
+  <div class="sp"></div>
+  <div class="myteam" id="mt" hidden></div>
+</div>
+
+<main id="app">
+  <div class="center"><div class="pulse"></div><div class="sub">연결 중…</div></div>
+</main>
+
+<div class="foot" id="foot"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const esc = s => String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let S=null, team=Number(localStorage.getItem('team'))||null, skew=0, tick=null, es=null, pending=null;
+
+// render()가 끝까지 성공했을 때만 시그니처를 기록한다 (실패하면 다음 갱신에서 재시도)
+let renderedSig='', poll=null;
+function apply(d){
+  S=d; skew=S.serverNow-Date.now();
+  $('#dot').className='dot live';
+  const sig=JSON.stringify(d,(k,v)=>k==='serverNow'?0:v);
+  if(sig===renderedSig) return;
+  try{ render(); renderedSig=sig; }
+  catch(e){ renderedSig=''; console.error('render 실패, 다음 갱신에서 재시도', e); }
+}
+function q(){ return 'role=team' + (team?('&team='+team):''); }
+const refresh = ()=>fetch('/api/state?'+q()).then(r=>r.json()).then(apply)
+  .catch(()=>$('#dot').className='dot');
+
+// 프록시가 스트림을 막는 환경(터널 등)에서는 자동으로 폴링으로 전환한다
+function connect(){
+  if(es) es.close();
+  clearInterval(poll); poll=null; renderedSig='';
+  let got=false;
+  const startPoll = ()=>{ if(!poll) poll=setInterval(refresh, 600); };
+  es = new EventSource('/api/stream?'+q());
+  es.onerror = ()=>{ if(got) $('#dot').className='dot'; else { es.close(); startPoll(); } };
+  es.onmessage = e => { got=true; apply(JSON.parse(e.data)); };
+  setTimeout(()=>{ if(!got){ es.close(); startPoll(); } }, 2500);
+  refresh();
+}
+
+async function join(n){
+  team=n; localStorage.setItem('team',n);
+  await fetch('/api/join',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({team:n})});
+  connect();
+}
+function leave(){
+  if(!confirm('테이블 선택을 다시 하시겠어요?')) return;
+  localStorage.removeItem('team'); team=null; pending=null; connect();
+}
+async function answer(i){
+  if(!S || !S.open) return;
+  pending=i; render();
+  const r = await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({team,choice:i})});
+  if(!r.ok){ pending=null; render(); } else refresh();
+}
+
+function myChoice(){ return pending!==null?pending:(S.my?S.my.choice:null); }
+function myRank(){ return (S.ranking||[]).find(r=>r.team===team); }
+
+function render(){
+  if(!S) return;
+  $('#ttl').textContent = S.meta.title;
+  const mt=$('#mt');
+  const me = (S.teams||[]).find(t=>t.no===team);
+  if(team){ mt.hidden=false; mt.textContent = me?me.label:String(team); } else mt.hidden=true;
+  $('#foot').innerHTML = team ? `${esc(S.meta.event)} · <span class="link" onclick="leave()">테이블 다시 선택</span>` : esc(S.meta.event);
+
+  if(!team){ app.innerHTML = viewJoin(); return; }
+  if(S.phase==='final'){ app.innerHTML = viewFinal(); return; }
+  if(S.phase==='lobby' || !S.item){ app.innerHTML = viewWait('곧 시작합니다','진행자 화면을 봐주세요'); return; }
+  if(S.phase==='outro'){ app.innerHTML = viewWait(S.outro.title, S.outro.lines[S.outro.lines.length-1]); return; }
+  if(S.revealed){ app.innerHTML = viewReveal(); return; }
+  app.innerHTML = viewQuestion();
+  startTick();
+}
+
+function viewJoin(){
+  const cards = S.teams.map(t=>{
+    const taken = S.connected.includes(t.no);
+    return `<div class="tcard ${taken?'taken':''}" onclick="join(${t.no})">
+      <div class="n">${esc(t.label)}</div><div class="a">${esc(t.agenda)}</div></div>`;
+  }).join('');
+  return `<div class="h">우리 테이블 번호를 눌러주세요</div>
+    <div class="sub">테이블에 붙은 번호와 같은 것을 고르시면 됩니다 · 팀당 한 분만</div>
+    <div class="grid">${cards}</div>`;
+}
+
+function viewWait(big,sub){
+  return `<div class="center"><div class="pulse"></div>
+    <div class="big">${esc(big)}</div><div class="sub">${esc(sub)}</div></div>`;
+}
+
+function badges(it){
+  return `<div class="badges">
+    ${it.scored?`<span class="badge num">문제 ${it.order} / ${S.scoredTotal}</span>`:`<span class="badge practice">연습문제</span>`}
+    ${it.agenda?`<span class="badge">${esc(it.agenda)}</span>`:''}
+  </div>`;
+}
+
+function viewQuestion(){
+  const it=S.item, my=myChoice();
+  const opts = it.choices.map((c,i)=>`
+    <button class="opt ${my===i?'sel':''}" ${S.open?'':'disabled'} onclick="answer(${i})">
+      <span class="n">${i+1}</span><span class="t">${esc(c)}</span></button>`).join('');
+  const timer = (S.open && S.deadlineAt) ? `
+    <div class="timer"><div class="tbar" id="tbar"><i id="tfill"></i></div>
+      <div class="tmeta"><span class="n" id="tnum">–</span><span>남은 시간</span></div></div>` : '';
+  const st = !S.open
+    ? `<div class="status">답변이 마감되었습니다${my!==null?' · 제출 완료':''}</div>`
+    : my!==null
+      ? `<div class="status ok">✓ ${my+1}번 제출 완료 · 마감 전까지 바꿀 수 있어요</div>`
+      : `<div class="status">답을 골라주세요</div>`;
+  return `${badges(it)}<div class="q">${esc(it.question)}</div><div class="opts">${opts}</div>${timer}${st}`;
+}
+
+function viewReveal(){
+  const it=S.item, r=S.reveal, my=S.my?S.my.choice:null;
+  const ok = my!==null && my===r.answerIndex;
+  const opts = it.choices.map((c,i)=>{
+    let cls='mute';
+    if(i===r.answerIndex) cls='correct';
+    else if(i===my) cls='wrong';
+    return `<button class="opt ${cls}" disabled><span class="n">${i+1}</span><span class="t">${esc(c)}</span></button>`;
+  }).join('');
+  const mr = myRank();
+  return `${badges(it)}
+  <div class="verdict ${my===null?'':ok?'ok':'no'}">
+    <div class="mk">${my===null?'–':ok?'O':'X'}</div>
+    <div class="lb">${my===null?'답을 제출하지 않았어요':ok?'정답입니다!':'아쉬워요'}</div>
+    <div class="an">정답 · ${esc(r.answerLabel)}</div>
+  </div>
+  <div class="opts">${opts}</div>
+  <div class="card hl"><div class="lb">핵심 숫자</div><div class="v">${esc(r.highlight)}</div></div>
+  <div class="card"><p>${esc(r.explanation)}</p><div class="src">출처 · ${esc(r.source)}</div></div>
+  ${it.scored&&mr?`<div class="scorebar">
+    <div class="sb"><div class="k">우리 팀 점수</div><div class="v">${mr.score}</div></div>
+    <div class="sb"><div class="k">현재 순위</div><div class="v">${mr.rank}위</div></div>
+  </div>`:''}`;
+}
+
+function viewFinal(){
+  const mr=myRank();
+  if(!mr) return viewWait('최종 순위','진행자 화면을 봐주세요');
+  const medal = mr.rank===1?'🥇':mr.rank===2?'🥈':mr.rank===3?'🥉':'🎉';
+  return `<div class="center">
+    <div class="medal">${medal}</div>
+    <div class="sub">${esc(mr.label)} 최종</div>
+    <div class="rankbig">${mr.rank}위</div>
+    <div class="big">${mr.score} / ${S.scoredTotal} 문제 정답</div>
+    <div class="sub" style="margin-top:8px">${esc(mr.agenda)}</div>
+  </div>`;
+}
+
+function startTick(){
+  clearInterval(tick);
+  if(!S.open || !S.deadlineAt) return;
+  const limit=S.meta.timeLimitSec*1000;
+  const run=()=>{
+    const f=$('#tfill'), n=$('#tnum'), b=$('#tbar');
+    if(!f) return clearInterval(tick);
+    const left=S.deadlineAt-(Date.now()+skew);
+    f.style.width=Math.max(0,Math.min(100,left/limit*100))+'%';
+    const sec=Math.max(0,Math.ceil(left/1000));
+    n.textContent=sec+'초';
+    const warn=sec<=10; n.classList.toggle('warn',warn); b.classList.toggle('warn',warn);
+    if(left<=0) clearInterval(tick);
+  };
+  run(); tick=setInterval(run,100);
+}
+
+let lastKey='';
+const _render=render;
+render=function(){
+  const k=S?[S.phase,S.index,S.open,S.revealed].join('|'):'';
+  if(k!==lastKey){ lastKey=k; pending=null; }
+  _render();
+};
+
+if(team) fetch('/api/join',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({team})});
+connect();
+</script>
+</body>
+</html>
