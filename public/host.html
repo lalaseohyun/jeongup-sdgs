@@ -256,20 +256,25 @@ function connect(){
   refresh();
 }
 
-/* ---- 참여 주소 ---- */
-// QR은 지금 진행자 화면을 연 주소를 그대로 쓴다.
-// 터널 주소로 진행자 화면을 열면 QR도 자동으로 그 주소가 되므로 따로 손댈 일이 없다.
-const DEFAULT_JOIN_URL = location.origin + '/';
-// 직접 입력해 둔 주소가 있어도, 지금 페이지와 도메인이 다르면 지난 행사의 죽은 주소이므로 버린다
-function initialJoinUrl(){
-  const saved = localStorage.getItem('joinUrl3');
-  if(!saved) return DEFAULT_JOIN_URL;
-  try{ if(new URL(saved).origin !== location.origin) return DEFAULT_JOIN_URL; }
-  catch{ return DEFAULT_JOIN_URL; }
-  return saved;
+/* ---- 참여 주소 ----
+   진행자 화면은 localhost로 열어도(권장 — 터널이 죽어도 이 화면은 멀쩡함) QR은 항상
+   맞는 인터넷 주소를 가리켜야 한다. 그래서 페이지 자신의 주소를 쓰지 않고,
+   서버에게 "지금 유효한 공개 주소가 뭐야?"라고 주기적으로 물어서 맞춘다.
+   진행자가 직접 주소를 입력하면 그 뒤로는 자동 갱신을 멈춘다. */
+let joinUrl = location.origin + '/';
+let joinUrlCustom = false;
+function setJoinUrl(u){ joinUrl = u; joinUrlCustom = true; renderedSig=''; render(); }
+
+async function syncJoinUrl(){
+  if(joinUrlCustom) return;
+  try{
+    const r = await fetch('/api/public-url');
+    const d = await r.json();
+    if(d.url && d.url + '/' !== joinUrl){ joinUrl = d.url + '/'; renderedSig=''; render(); }
+  }catch{}
 }
-let joinUrl = initialJoinUrl();
-function setJoinUrl(u){ joinUrl = u; localStorage.setItem('joinUrl3', u); renderedSig=''; render(); }
+syncJoinUrl();
+setInterval(syncJoinUrl, 15000);
 
 /* ---- 참여/제출 집계 ----
    접속하지 않은 팀은 기다리지 않는다. 기권이 있을 수 있으므로

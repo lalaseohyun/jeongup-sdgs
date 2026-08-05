@@ -326,6 +326,12 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (p === "/api/public-url") {
+    // 지금 유효한 인터넷 주소 — 참가자 QR이 진행자 화면 위치(localhost든 터널이든)와
+    // 무관하게 항상 맞는 곳을 가리키도록 진행자 화면이 이걸 물어본다.
+    return json(res, 200, { url: publicUrl });
+  }
+
   if (p === "/api/state") {
     const role = url.searchParams.get("role") === "host" ? "host" : "team";
     if (role === "host" && url.searchParams.get("k") !== HOST_KEY) return json(res, 403, { error: "forbidden" });
@@ -416,6 +422,10 @@ server.listen(PORT, "0.0.0.0", async () => {
   else console.log(`  인터넷 공개가 필요하면 :  npm run live\n${LINE}\n`);
 });
 
+// 지금 유효한 공개(인터넷) 주소. 진행자 화면이 어디서 열렸든(localhost든 터널 주소든)
+// QR을 맞게 그릴 수 있도록 /api/public-url로 알려준다.
+let publicUrl = null;
+
 async function startTunnel() {
   let cf;
   try {
@@ -432,30 +442,55 @@ async function startTunnel() {
 
   let t = null;
   let stopping = false;
+  let restarting = false;
 
   const spawn = () => {
+    restarting = false;
     t = cf.Tunnel.quick(`http://localhost:${PORT}`);
     t.on("url", (url) => {
+      publicUrl = url;
       console.log(`\n${LINE}`);
       console.log(`  🌐 인터넷 주소 (휴대폰 데이터로 접속 가능)`);
       console.log(LINE);
       console.log(`  팀 참여 화면   ${url}/`);
       console.log(`  진행자 화면   ${url}/host?k=${HOST_KEY}`);
+      console.log(`  진행자 화면(권장)   http://localhost:${PORT}/host?k=${HOST_KEY}`);
       console.log(LINE);
-      console.log(`  ※ 진행자 화면을 위 인터넷 주소로 열어야 QR이 올바르게 나옵니다.`);
-      console.log(`  ※ 이 창을 닫으면 주소가 사라집니다. 행사 끝날 때까지 켜두세요.\n`);
+      console.log(`  ※ 팀 참여 QR은 자동으로 이 주소를 가리킵니다. 진행자 화면은`);
+      console.log(`     인터넷이 아니라 위 localhost 주소로 여는 편이 훨씬 안전합니다`);
+      console.log(`     (터널이 죽어도 진행자 화면은 멀쩡히 돌아갑니다).`);
+      console.log(`  ※ 이 창을 닫으면 서버가 꺼집니다. 행사 끝날 때까지 켜두세요.\n`);
     });
     t.on("error", (e) => console.log("  [터널] 오류:", e.message));
     t.on("exit", () => {
-      if (stopping) return;
+      publicUrl = null;
+      if (stopping || restarting) return;
       console.log("  [터널] 연결이 끊겼습니다. 5초 후 새 주소를 만듭니다…");
       setTimeout(spawn, 5000);
     });
   };
   spawn();
 
+  // cloudflared 무료 터널은 프로세스는 살아있는데 주소만 조용히 죽는 경우가 있다
+  // (exit 이벤트가 안 온다). 그래서 주기적으로 실제로 열리는지 직접 확인한다.
+  const healthCheck = setInterval(async () => {
+    if (!publicUrl || stopping || restarting) return;
+    try {
+      const r = await fetch(publicUrl + "/qr.svg?d=x", { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+    } catch {
+      if (restarting) return;
+      restarting = true;
+      console.log(`  [터널] 주소가 응답하지 않습니다. 새로 만듭니다…`);
+      publicUrl = null;
+      try { t && t.stop(); } catch {}
+      setTimeout(spawn, 3000);
+    }
+  }, 45000);
+
   process.on("SIGINT", () => {
     stopping = true;
+    clearInterval(healthCheck);
     try { t && t.stop(); } catch {}
     process.exit(0);
   });
