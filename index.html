@@ -128,53 +128,65 @@ main{flex:1;padding:26px 18px 34px;display:flex;flex-direction:column}
 
 <div class="foot" id="foot"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/quiz-common.js"></script>
 <script>
+const C = window.QuizCommon;
 const $ = s => document.querySelector(s);
 const app = $('#app');
 const esc = s => String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-let S=null, team=Number(localStorage.getItem('team'))||null, skew=0, tick=null, es=null, pending=null;
+let S=null, team=Number(localStorage.getItem('team'))||null, skew=0, tick=null, pending=null;
+
+/* ---- Firebase 상태 ---- */
+let quiz=null, ITEMS=[], LABEL={}, SHORT={}, db=null, ready=false;
+let state=C.emptyState(), answers={}, joined={}, present={};
+
+function recompute(){
+  if(!ready) return;
+  apply(C.buildPayload({ quiz, ITEMS, LABEL, SHORT, state, answers, joined, present, role:'team', team }));
+}
 
 // render()가 끝까지 성공했을 때만 시그니처를 기록한다 (실패하면 다음 갱신에서 재시도)
-let renderedSig='', poll=null;
+let renderedSig='';
 function apply(d){
   S=d; skew=S.serverNow-Date.now();
-  $('#dot').className='dot live';
   const sig=JSON.stringify(d,(k,v)=>k==='serverNow'?0:v);
   if(sig===renderedSig) return;
   try{ render(); renderedSig=sig; }
   catch(e){ renderedSig=''; console.error('render 실패, 다음 갱신에서 재시도', e); }
 }
-function q(){ return 'role=team' + (team?('&team='+team):''); }
-const refresh = ()=>fetch('/api/state?'+q()).then(r=>r.json()).then(apply)
-  .catch(()=>$('#dot').className='dot');
 
-// 프록시가 스트림을 막는 환경(터널 등)에서는 자동으로 폴링으로 전환한다
-function connect(){
-  if(es) es.close();
-  clearInterval(poll); poll=null; renderedSig='';
-  let got=false;
-  const startPoll = ()=>{ if(!poll) poll=setInterval(refresh, 600); };
-  es = new EventSource('/api/stream?'+q());
-  es.onerror = ()=>{ if(got) $('#dot').className='dot'; else { es.close(); startPoll(); } };
-  es.onmessage = e => { got=true; apply(JSON.parse(e.data)); };
-  setTimeout(()=>{ if(!got){ es.close(); startPoll(); } }, 2500);
-  refresh();
-}
-
-async function join(n){
+/* ---- 참여/제출 — Firebase Realtime Database에 직접 기록한다 ---- */
+function join(n){
   team=n; localStorage.setItem('team',n);
-  await fetch('/api/join',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({team:n})});
-  connect();
+  C.roomRef(db,'joined/'+n).transaction(cur => (cur===null||cur===undefined) ? C.now() : cur);
+  armPresence();
+  recompute();
 }
 function leave(){
   if(!confirm('테이블 선택을 다시 하시겠어요?')) return;
-  localStorage.removeItem('team'); team=null; pending=null; connect();
+  disarmPresence();
+  localStorage.removeItem('team'); team=null; pending=null; recompute();
 }
-async function answer(i){
+function answer(i){
   if(!S || !S.open) return;
   pending=i; render();
-  const r = await fetch('/api/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({team,choice:i})});
-  if(!r.ok){ pending=null; render(); } else refresh();
+  C.roomRef(db,'answers/'+S.item.id+'/'+team).set({ choice:i, ms: state.openedAt ? Math.max(0, C.now()-state.openedAt) : 0 });
+  pending=null;
+}
+
+// 지금 이 화면이 열려 있는 동안만 "접속중"으로 표시되게 한다. 연결이 끊기면 자동으로 지워진다.
+function armPresence(){
+  if(!team) return;
+  const ref = C.roomRef(db,'present/'+team);
+  ref.onDisconnect().remove();
+  ref.set(true);
+}
+function disarmPresence(){
+  if(!team) return;
+  C.roomRef(db,'present/'+team).remove();
 }
 
 function myChoice(){ return pending!==null?pending:(S.my?S.my.choice:null); }
@@ -194,7 +206,6 @@ function render(){
   if(S.phase==='outro'){ app.innerHTML = viewWait(S.outro.title, S.outro.lines[S.outro.lines.length-1]); return; }
   if(S.revealed){ app.innerHTML = viewReveal(); return; }
   app.innerHTML = viewQuestion();
-  startTick();
 }
 
 function viewJoin(){
@@ -225,15 +236,12 @@ function viewQuestion(){
   const opts = it.choices.map((c,i)=>`
     <button class="opt ${my===i?'sel':''}" ${S.open?'':'disabled'} onclick="answer(${i})">
       <span class="n">${i+1}</span><span class="t">${esc(c)}</span></button>`).join('');
-  const timer = (S.open && S.deadlineAt) ? `
-    <div class="timer"><div class="tbar" id="tbar"><i id="tfill"></i></div>
-      <div class="tmeta"><span class="n" id="tnum">–</span><span>남은 시간</span></div></div>` : '';
   const st = !S.open
     ? `<div class="status">답변이 마감되었습니다${my!==null?' · 제출 완료':''}</div>`
     : my!==null
       ? `<div class="status ok">✓ ${my+1}번 제출 완료 · 마감 전까지 바꿀 수 있어요</div>`
       : `<div class="status">답을 골라주세요</div>`;
-  return `${badges(it)}<div class="q">${esc(it.question)}</div><div class="opts">${opts}</div>${timer}${st}`;
+  return `${badges(it)}<div class="q">${esc(it.question)}</div><div class="opts">${opts}</div>${st}`;
 }
 
 function viewReveal(){
@@ -274,23 +282,6 @@ function viewFinal(){
   </div>`;
 }
 
-function startTick(){
-  clearInterval(tick);
-  if(!S.open || !S.deadlineAt) return;
-  const limit=S.meta.timeLimitSec*1000;
-  const run=()=>{
-    const f=$('#tfill'), n=$('#tnum'), b=$('#tbar');
-    if(!f) return clearInterval(tick);
-    const left=S.deadlineAt-(Date.now()+skew);
-    f.style.width=Math.max(0,Math.min(100,left/limit*100))+'%';
-    const sec=Math.max(0,Math.ceil(left/1000));
-    n.textContent=sec+'초';
-    const warn=sec<=10; n.classList.toggle('warn',warn); b.classList.toggle('warn',warn);
-    if(left<=0) clearInterval(tick);
-  };
-  run(); tick=setInterval(run,100);
-}
-
 let lastKey='';
 const _render=render;
 render=function(){
@@ -299,8 +290,34 @@ render=function(){
   _render();
 };
 
-if(team) fetch('/api/join',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({team})});
-connect();
+/* ---- 부팅 ---- */
+C.loadQuizData().then(data=>{
+  quiz = data;
+  ITEMS = C.buildItems(quiz);
+  const maps = C.buildMaps(quiz);
+  LABEL = maps.LABEL; SHORT = maps.SHORT;
+  try{ db = C.initFirebase(); } catch(e){
+    app.innerHTML = `<div class="center"><div class="big">설정 오류</div><div class="sub">${esc(e.message)}</div></div>`;
+    return;
+  }
+
+  db.ref('.info/connected').on('value', snap=>{
+    $('#dot').className = snap.val()===true ? 'dot live' : 'dot';
+    if(snap.val()===true && team) armPresence(); // 재연결 시 다시 등록해야 onDisconnect가 살아있다
+  });
+  C.roomRef(db,'state').on('value', snap=>{ state = snap.val() || C.emptyState(); ready=true; recompute(); });
+  C.roomRef(db,'answers').on('value', snap=>{ answers = snap.val() || {}; recompute(); });
+  C.roomRef(db,'joined').on('value', snap=>{ joined = snap.val() || {}; recompute(); });
+  C.roomRef(db,'present').on('value', snap=>{ present = snap.val() || {}; recompute(); });
+
+  // 새로고침·화면 꺼짐 후 다시 들어와도 팀 선택이 유지된다 (localStorage 기준).
+  if(team){
+    C.roomRef(db,'joined/'+team).transaction(cur => (cur===null||cur===undefined) ? C.now() : cur);
+    armPresence();
+  }
+}).catch(e=>{
+  app.innerHTML = `<div class="center"><div class="big">불러오기 실패</div><div class="sub">${esc(e.message)}</div></div>`;
+});
 </script>
 </body>
 </html>

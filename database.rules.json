@@ -1,0 +1,11 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "rooms": {
+      "$room": {
+        "answers": { ".indexOn": "team" }
+      }
+    }
+  }
+}
