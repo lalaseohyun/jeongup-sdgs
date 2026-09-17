@@ -302,11 +302,8 @@ const ACTIONS = {
 function post(action, body){ (ACTIONS[action]||function(){})(body||{}); }
 
 /* ---- 참여 주소 ----
-   주소는 고정이라(GitHub Pages) 배포 주소에서 열었으면 항상 그 주소를 QR로 그린다.
-   다른 주소(로컬 테스트 등)에서 열었을 때는 QR 대신 지금 주소를 글자로 보여준다.
-   진행자가 직접 주소를 입력하면 그 뒤로는 자동으로 되돌리지 않는다. */
-const PROD_TEAM_URL = C.PROD_ORIGIN + '/';
-let joinUrl = location.origin === C.PROD_ORIGIN ? PROD_TEAM_URL : (location.origin + location.pathname.replace(/host\/?(index\.html)?$/, ''));
+   진행자 화면 주소에서 /host/ 를 뗀 곳이 팀 참여 주소다. 배포 주소가 고정이라 QR도 항상 같다. */
+let joinUrl = location.origin + location.pathname.replace(/host\/?(index\.html)?$/, '');
 let joinUrlCustom = false;
 function setJoinUrl(u){ joinUrl = u; joinUrlCustom = true; renderedSig=''; render(); }
 

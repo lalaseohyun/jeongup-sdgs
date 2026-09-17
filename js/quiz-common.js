@@ -16,8 +16,6 @@
   var ROOM_ID = "jeongup2026";
   var ACCESS_KEY = "jeongup2026";
   var DATA_PATH_FROM_ROOT = "data/jeongeup-quiz-2026.json";
-  // 배포된 고정 주소. 여기서 열었을 때만 QR이 유효합니다.
-  var PROD_ORIGIN = "https://lalaseohyun.github.io/jeongup-sdgs";
 
   var serverOffset = 0;
 
@@ -229,7 +227,6 @@
   global.QuizCommon = {
     ROOM_ID: ROOM_ID,
     ACCESS_KEY: ACCESS_KEY,
-    PROD_ORIGIN: PROD_ORIGIN,
     getQueryParam: getQueryParam,
     checkAccessKey: checkAccessKey,
     loadQuizData: loadQuizData,
